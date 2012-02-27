@@ -1,0 +1,48 @@
+Name:                   conj-gradient-accelerate
+Version:                0.1.0.0
+License:                BSD3
+License-file:           LICENSE
+Author:                 The Accelerate Team
+Maintainer:             Robert Jakob<jakobro@informatik.uni-freiburg.de>
+Category:               Compilers/Interpreters,
+Build-type:             Simple
+Cabal-version:          >=1.6
+
+Synopsis:               Cloth simulation example using the Accelerate library
+Description:            This package provides a parallel implementation of the conjugant graduate
+                        method as described in Baraff and Witkin's Large Steps in Cloth Simulation.
+
+Flag cuda
+  Description:          Enable the CUDA parallel backend for NVIDIA GPUs
+  Default:              True
+
+Flag opencl
+  Description:          Enable the OpenCL parallel backend
+  Default:              True
+
+Flag io
+  Description:          Provide access to the block copy I/O functionality
+  Default:              True
+
+
+-- The main examples program including verification and timing tests for several
+-- simple accelerate programs
+--
+Executable conf-gradient-accelerate
+  Main-is:              Main.hs
+  hs-source-dirs:       src
+
+--  other-modules:
+
+  build-depends:        accelerate              == 0.9.*,
+                        accelerate-cuda         == 0.9.*,
+                        accelerate-matrices     == 0.1.*,
+                        base                    == 4.*,
+                        fclabels                >= 1.0
+  if flag(cuda)
+    CPP-options:        -DACCELERATE_CUDA_BACKEND
+
+-- source-repository head
+--  type:                 git
+--  location:             https://github.com/tmcdonell/accelerate-examples
+
