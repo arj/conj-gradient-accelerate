@@ -1,6 +1,6 @@
 module Cloth where
 
-import Data.Array.Accelerate           (Vector, Segments, Acc, use, (?))
+import Data.Array.Accelerate  --         (Vector, Segments, Acc, use, (?))
 import qualified Data.Array.Accelerate as Acc
 import Data.Array.Accelerate.Math
 import Data.Array.Accelerate.Math.SMVM
@@ -12,15 +12,27 @@ filterMPCG :: AccVector Float -> AccVector Float
 filterMPCG v = v -- TODO Not implemented until now
 
 
+mpcgSingleStep :: AccSparseMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> AccScalar Float ->
+  (AccVector Float, AccVector Float, AccVector Float, AccScalar Float)
+mpcgSingleStep a dv r c delta = (dv', r', c', delta')
+  where
+    p_inv     = a -- TODO
+    q         = filterMPCG (smvmAcc a c)
+    p_cq      = dotpAcc c q
+--    alpha   = rho / -- TODO
+    alpha     = use $ Acc.fromList (Z) [1]   :: AccScalar Float
+    alpha_c   = alpha *. c                   :: AccVector Float
+    dv'       = Acc.zipWith (+) dv alpha_c   :: AccVector Float
+    alpha_q   = alpha *. q
+    r         = Acc.zipWith (-) r alpha_q
+    s         = smvmAcc p_inv r 
+    delta'    = dotpAcc r s                  :: AccScalar Float
+    beta      = Acc.zipWith (/) delta' delta :: AccScalar Float
+    beta_c    = beta *. c                    :: AccVector Float
+    c'        = filterMPCG (Acc.zipWith (+) s beta_c)
+    r' = r
 
-loopTest :: AccVector Int -> AccScalar Int
-loopTest v = Acc.fold (+) 1 v
 
-
-loopTest2 :: Int -> AccVector Int -> AccScalar Int
-loopTest2 n vs
- | n == 0    = Acc.fold (+) 1 vs
- | otherwise = loopTest2 (n-1) vs 
 
 
 -- Compute 'dv' in 'A * dv = B' with preconditioned conjugate gradient method.

@@ -3,6 +3,7 @@
 module Main where
 
 import Cloth
+import Looptest
 import Config
 import System.Environment
 import Data.Array.Accelerate      ( Array, Scalar, Exp, Acc,DIM1,DIM0,DIM2, Z(..), (:.)(..) )

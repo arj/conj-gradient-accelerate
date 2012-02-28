@@ -10,5 +10,7 @@ import Data.Array.Accelerate.Types
 loopTest :: AccVector Int -> AccScalar Int
 loopTest v = Acc.fold (+) 1 v
 
-loopTest2 :: AccScalar Int -> AccScalar Int
-loopTest2 n = Acc.cond (1 Acc.<* (Acc.the n)) (loopTest2 (Acc.map (-1) n)) 0
+loopTest2 :: Int -> AccVector Int -> AccScalar Int
+loopTest2 n vs
+ | n == 0    = Acc.fold (+) 1 vs
+ | otherwise = loopTest2 (n-1) vs 
