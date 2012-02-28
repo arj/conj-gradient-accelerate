@@ -33,8 +33,6 @@ mpcgSingleStep a dv r c delta = (dv', r', c', delta')
     r' = r
 
 
-
-
 -- Compute 'dv' in 'A * dv = B' with preconditioned conjugate gradient method.
 --
 -- * SparseMatrix in compressed row format

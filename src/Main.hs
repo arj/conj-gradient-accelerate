@@ -25,4 +25,4 @@ main = do
 --  !_ <- return $ run config loopTest (A.fromList (Z :. (5 :: Int)) [0,1,2,3,4])
   putStrLn $ show $ run config loopTest2Ten (A.fromList (Z :. (5 :: Int)) [0,1,2,3,4])
   where
-    loopTest2Ten = loopTest2 10
+    loopTest2Ten = loopTest2 100
