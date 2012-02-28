@@ -20,7 +20,7 @@ loopTest v = Acc.fold (+) 1 v
 loopTest2 :: Int -> AccVector Int -> AccScalar Int
 loopTest2 n vs
  | n == 0    = Acc.fold (+) 1 vs
- | otherwise = loopTest2 (n-1) vs 
+ | otherwise = Acc.map (+1) (loopTest2 (n-1) vs)
 
 
 -- Compute 'dv' in 'A * dv = B' with preconditioned conjugate gradient method.
