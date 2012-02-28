@@ -17,10 +17,10 @@ loopTest :: AccVector Int -> AccScalar Int
 loopTest v = Acc.fold (+) 1 v
 
 
-loopTest2 :: AccVector Int -> Int -> AccScalar Int
-loopTest2 vs n
+loopTest2 :: Int -> AccVector Int -> AccScalar Int
+loopTest2 n vs
  | n == 0    = Acc.fold (+) 1 vs
- | otherwise = loopTest2 vs (n-1)
+ | otherwise = loopTest2 (n-1) vs 
 
 
 -- Compute 'dv' in 'A * dv = B' with preconditioned conjugate gradient method.
