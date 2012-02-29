@@ -7,31 +7,41 @@ import Data.Array.Accelerate.Math.SMVM
 import Data.Array.Accelerate.Types
 
 
--- TODO Maybe this should return Acc (Vector Float)?
 filterMPCG :: AccVector Float -> AccVector Float
 filterMPCG v = v -- TODO Not implemented until now
 
 
-mpcgSingleStep :: AccSparseMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> AccScalar Float ->
-  (AccVector Float, AccVector Float, AccVector Float, AccScalar Float)
-mpcgSingleStep a dv r c delta = (dv', r', c', delta')
+-- TODO p_inv could be represented as a single vector!
+mpcgSingleStep :: AccSparseMatrix Float -> AccSparseMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> AccScalar Float -> Int ->
+  AccVector Float
+mpcgSingleStep p_inv a dv r c delta n
+  | n == 0    = dv
+  | otherwise = mpcgSingleStep p_inv a dv' r' c' delta' (pred n)
   where
-    p_inv     = a -- TODO
     q         = filterMPCG (smvmAcc a c)
     p_cq      = dotpAcc c q
---    alpha   = rho / -- TODO
-    alpha     = use $ Acc.fromList (Z) [1]   :: AccScalar Float
+    alpha     = delta /. p_cq
     alpha_c   = alpha *. c                   :: AccVector Float
     dv'       = Acc.zipWith (+) dv alpha_c   :: AccVector Float
     alpha_q   = alpha *. q
-    r         = Acc.zipWith (-) r alpha_q
-    s         = smvmAcc p_inv r 
-    delta'    = dotpAcc r s                  :: AccScalar Float
+    r         = Acc.zipWith (-) r alpha_q    :: AccVector Float
+    s         = smvmAcc p_inv r              :: AccVector Float
+    delta'    = dotpAcc r s                  
     beta      = Acc.zipWith (/) delta' delta :: AccScalar Float
     beta_c    = beta *. c                    :: AccVector Float
     c'        = filterMPCG (Acc.zipWith (+) s beta_c)
     r' = r
 
+
+mpcgInitial a epsilon b z n = mpcgSingleStep p_inv a dv r c delta n
+  where
+    p_inv   = a -- smvmAcc (smunity $ smrows a) a -- This should be quadradic?!
+    p       = p -- smScalarMul
+    dv      = z
+    rho     = dotpAcc (filterMPCG b) (smvmAcc p b)
+    r       = filterMPCG (Acc.zipWith (-) b (smvmAcc a dv))
+    c       = smvmAcc p_inv r
+    delta   = dotpAcc r c
 
 -- Compute 'dv' in 'A * dv = B' with preconditioned conjugate gradient method.
 --
