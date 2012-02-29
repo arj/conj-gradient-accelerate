@@ -28,7 +28,7 @@ Flag io
 -- The main examples program including verification and timing tests for several
 -- simple accelerate programs
 --
-Executable conf-gradient-accelerate
+Executable conj-gradient-accelerate
   Main-is:              Main.hs
   hs-source-dirs:       src
 
