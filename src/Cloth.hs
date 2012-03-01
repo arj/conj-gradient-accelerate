@@ -12,7 +12,7 @@ filterMPCG v = v -- TODO Not implemented until now
 
 
 -- TODO p_inv could be represented as a single vector!
-mpcgSingleStep :: AccSparseMatrix Float -> AccSparseMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> AccScalar Float -> Int ->
+mpcgSingleStep :: AccVector Float -> AccSparseMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> AccScalar Float -> Int ->
   AccVector Float
 mpcgSingleStep p_inv a dv r c delta n
   | n == 0    = dv
@@ -21,26 +21,29 @@ mpcgSingleStep p_inv a dv r c delta n
     q         = filterMPCG (smvmAcc a c)
     p_cq      = dotpAcc c q
     alpha     = delta /. p_cq
-    alpha_c   = alpha *. c                   :: AccVector Float
-    dv'       = Acc.zipWith (+) dv alpha_c   :: AccVector Float
+    alpha_c   = alpha *. c 
+    dv'       = Acc.zipWith (+) dv alpha_c
     alpha_q   = alpha *. q
-    r         = Acc.zipWith (-) r alpha_q    :: AccVector Float
-    s         = smvmAcc p_inv r              :: AccVector Float
-    delta'    = dotpAcc r s                  
-    beta      = Acc.zipWith (/) delta' delta :: AccScalar Float
-    beta_c    = beta *. c                    :: AccVector Float
+    r         = Acc.zipWith (-) r alpha_q
+    s         = p_inv *^ r
+    delta'    = dotpAcc r s
+    beta      = Acc.zipWith (/) delta' delta
+    beta_c    = beta *. c
     c'        = filterMPCG (Acc.zipWith (+) s beta_c)
     r' = r
 
 
-mpcgInitial a epsilon b z n = mpcgSingleStep p_inv a dv r c delta n
+mpcgInitial :: SparseMatrix Float -> Vector Float -> Vector Float -> Vector Float -> Float -> Int -> AccVector Float
+mpcgInitial a' b' z' p' epsilon n = mpcgSingleStep p_inv a dv r c delta n
   where
-    p_inv   = a -- smvmAcc (smunity $ smrows a) a -- This should be quadradic?!
-    p       = p -- smScalarMul
-    dv      = z
-    rho     = dotpAcc (filterMPCG b) (smvmAcc p b)
+    a       = usesm a'
+    b       = use b'
+    p       = use p'
+    p_inv   = vectorInverseAcc p
+    dv      = use $ z'
+    delta0  = dotpAcc (filterMPCG b) (p *^ b)
     r       = filterMPCG (Acc.zipWith (-) b (smvmAcc a dv))
-    c       = smvmAcc p_inv r
+    c       = p_inv *^ r
     delta   = dotpAcc r c
 
 -- Compute 'dv' in 'A * dv = B' with preconditioned conjugate gradient method.
