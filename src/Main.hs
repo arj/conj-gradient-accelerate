@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP, BangPatterns #-}
 
 module Main where
 
@@ -8,7 +8,9 @@ import Config
 import System.Environment
 import Data.Array.Accelerate      ( Array, Scalar, Exp, Acc,DIM1,DIM0,DIM2, Z(..), (:.)(..) )
 import qualified Data.Array.Accelerate as A
+#ifdef ACCELERATE_CUDA_BACKEND
 import qualified Data.Array.Accelerate.CUDA as CUDA
+#endif
 
 -- Main
 -- ====

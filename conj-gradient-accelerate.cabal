@@ -14,11 +14,11 @@ Description:            This package provides a parallel implementation of the c
 
 Flag cuda
   Description:          Enable the CUDA parallel backend for NVIDIA GPUs
-  Default:              True
+  Default:              False
 
 Flag opencl
   Description:          Enable the OpenCL parallel backend
-  Default:              True
+  Default:              False
 
 Flag io
   Description:          Provide access to the block copy I/O functionality
@@ -34,8 +34,8 @@ Executable conj-gradient-accelerate
 
 --  other-modules:
 
-  build-depends:        accelerate              == 0.9.*,
-                        accelerate-cuda         == 0.9.*,
+  build-depends:        accelerate              == 0.9.1.*,
+--                        accelerate-cuda         == 0.9.*,
                         accelerate-matrices     == 0.1.*,
                         base                    == 4.*,
                         fclabels                >= 1.0
