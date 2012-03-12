@@ -12,7 +12,7 @@ filterMPCG v = v -- TODO Not implemented until now
 
 mpcgSingleStep :: AccVector Float -> AccSparseMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> AccScalar Float -> Int ->
   AccVector Float
-mpcgSingleStep p_inv a dv r c delta n
+mpcgSingleStep p_inv a dv r_in c delta n
   | n == 0    = dv
   | otherwise = mpcgSingleStep p_inv a dv' r' c' delta' (pred n)
   where
@@ -22,7 +22,7 @@ mpcgSingleStep p_inv a dv r c delta n
     alpha_c   = alpha *. c 
     dv'       = Acc.zipWith (+) dv alpha_c
     alpha_q   = alpha *. q
-    r         = Acc.zipWith (-) r alpha_q
+    r         = Acc.zipWith (-) r_in alpha_q
     s         = p_inv *^ r
     delta'    = dotpAcc r s
     beta      = Acc.zipWith (/) delta' delta
