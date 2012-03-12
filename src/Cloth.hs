@@ -47,11 +47,11 @@ mpcgInitial a' b' z' p' epsilon n = mpcgSingleStep p_inv a dv r c delta n
 
 -----------------------------------------------------------
 
-bug = mpcgInitial a b z p e n
+bug :: Int -> AccVector Float
+bug n = mpcgInitial a b z p e n
   where
     a = fromArrayZero $ fromList (Z :. (3 :: Int) :. (3 :: Int)) ([1,1,1,1,5,1,1,1,1] :: [Float])
     b = fromList (Z :. (3 :: Int)) ([6,14,18] :: [Float])
     z = fromList (Z :. (3 :: Int)) ([0,0,0] :: [Float]) 
     p = fromList (Z :. (3 :: Int)) ([1,5,1] :: [Float])
-    e = 0
-    n = 10
+    e = 0.001 
