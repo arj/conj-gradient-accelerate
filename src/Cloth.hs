@@ -77,8 +77,11 @@ index1op ix op n = index1 (op (unindex1 ix) n)
 -- | Gets the index of a value in a vector.
 -- Requires that the element searched for is unique!
 -- TODO Fetch first index of element?
-{-indexOf :: (Elt a, Shape ix) => a -> AccVector a -> ix
-indexOf val xs = Acc.map (+)-}
+{-indexOf :: (Elt a, Shape ix) => a -> AccVector a -> Exp ix
+indexOf val xs =
+  where
+    idxs      = generate (shape xs) unindex1
+    selectIdx = Acc.zipWith -}
 
 -- *********** Actions on Acc Vectors
 
@@ -113,6 +116,15 @@ extractRow n (segs, (idxs, vals)) = (takerow idxs, takerow vals)
     before     = the $ accSum $ accTake n segs
     count      = segs Acc.! (index1 n)
     takerow xs = accTake count $ accDrop before xs
+
+
+-- find :: (Elt a, Shape ix) => Exp Int -> Acc (Array ix (Int, a)) -> a -> Exp a
+find :: (Shape ix) => Exp Int -> Acc (Array ix (Int, Float)) -> Exp Float
+find i xs = Acc.snd $ the $ Acc.foldAll f def xs
+  where
+    def = (0,0) :: Exp (Float, Float)
+    f ack v = (i ==* Acc.fst v) ? (v, ack)
+
 
 -- | Creates a vector from a sparse vector
 {-vectorFromSparseVector :: AccSparseVector a -> Int -> AccVector a
