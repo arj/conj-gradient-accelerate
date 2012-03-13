@@ -96,12 +96,12 @@ type AccMultiSparseMatrix a = (AccSparseMatrix Int, (AccSparseMatrix Int, AccSpa
 type AccThreeTupleVector = Acc (Vector (Int,Int,Int))
 
 -- | Extracts a row from a sparse matrix
--- | n is 1-based, not 0-based!
+--   n is 0-based
 extractRow :: (Elt a) => Exp Int -> AccSparseMatrix a -> AccSparseVector a
 extractRow n (segs, (idxs, vals)) = (takerow idxs, takerow vals)
   where
-    before     = traceShow (the $ accSum $ accTake (n-1) segs)
-    count      = segs Acc.! (index1 (n + 1))
+    before     = the $ accSum $ accTake n segs
+    count      = segs Acc.! (index1 n)
     takerow xs = accTake count $ accDrop before xs
 
 -- mpcgMultiInitialAcc :: AccMultiSparseMatrix Float -> AccMultiVector Float -> AccMultiVector Float -> AccMultiVector Float -> Float -> Int -> Int -> AccThreeTupleVector
