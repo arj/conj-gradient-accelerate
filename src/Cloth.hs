@@ -74,18 +74,28 @@ mpcgInitialAcc a b z p epsilon n = mpcgSingleStep p_inv a dv r c delta delta0 ep
 index1op :: Exp (Z :. Int) -> (Exp Int -> t -> Exp Int) -> t -> Exp (Z :. Int)
 index1op ix op n = index1 (op (unindex1 ix) n)
 
+-- | Gets the index of a value in a vector.
+-- Requires that the element searched for is unique!
+-- TODO Fetch first index of element?
+{-indexOf :: (Elt a, Shape ix) => a -> AccVector a -> ix
+indexOf val xs = Acc.map (+)-}
 
 -- *********** Actions on Acc Vectors
 
 accSum :: (Elt a, IsNum a) => AccVector a -> AccScalar a
 accSum xs = Acc.foldAll (+) 0 xs
 
+accHead :: (Elt a) => AccVector a -> AccScalar a
+accHead xs = Acc.reshape (lift Z) $ Acc.backpermute (index1 1) (\x -> x) xs
+
+accTail :: (Elt a) => AccVector a -> AccVector a
+accTail = accDrop 1
+
 accTake :: (Elt a) => Exp Int -> AccVector a -> AccVector a
 accTake n xs = Acc.backpermute (index1 n) (\x -> x) xs
 
 accDrop :: (Elt a) => Exp Int -> AccVector a -> AccVector a
 accDrop n xs = Acc.backpermute (index1op (shape xs) (-) n) (\i -> index1op i (+) n) xs
-
 
 
 
@@ -103,6 +113,14 @@ extractRow n (segs, (idxs, vals)) = (takerow idxs, takerow vals)
     before     = the $ accSum $ accTake n segs
     count      = segs Acc.! (index1 n)
     takerow xs = accTake count $ accDrop before xs
+
+-- | Creates a vector from a sparse vector
+{-vectorFromSparseVector :: AccSparseVector a -> Int -> AccVector a
+vectorFromSparseVector (idx,val) size = permute (+) def transfer val
+  where
+    def         = use $ fromList (Z :. size) $ take size $ repeat 0
+    transfer ix = unindex1 ix
+-}
 
 -- mpcgMultiInitialAcc :: AccMultiSparseMatrix Float -> AccMultiVector Float -> AccMultiVector Float -> AccMultiVector Float -> Float -> Int -> Int -> AccThreeTupleVector
 -- mpcgMultiInitialAcc a b z p epsilon n eqcount = Acc.map f eqcount'
