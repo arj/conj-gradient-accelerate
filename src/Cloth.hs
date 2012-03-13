@@ -117,22 +117,21 @@ extractRow n (segs, (idxs, vals)) = (takerow idxs, takerow vals)
     count      = segs Acc.! (index1 n)
     takerow xs = accTake count $ accDrop before xs
 
-
--- find :: (Elt a, Shape ix) => Exp Int -> Acc (Array ix (Int, a)) -> a -> Exp a
-find :: (Shape ix) => Exp Int -> Acc (Array ix (Int, Float)) -> Exp Float
-find i xs = Acc.snd $ the $ Acc.foldAll f def xs
+-- | Fetches an entry from a sparse vector.
+getEntry :: (Elt a) => Exp Int -> a -> AccSparseVector a -> Exp a
+getEntry i d (idx,val) = Acc.snd $ the $ Acc.foldAll f def xs
   where
-    def = (0,0) :: Exp (Float, Float)
+    xs  = Acc.zip idx val
+    def = constant (0,d)
     f ack v = (i ==* Acc.fst v) ? (v, ack)
 
-
 -- | Creates a vector from a sparse vector
-{-vectorFromSparseVector :: AccSparseVector a -> Int -> AccVector a
-vectorFromSparseVector (idx,val) size = permute (+) def transfer val
+vectorFromSparseVector :: (Elt a) => AccSparseVector a -> Int -> a -> AccVector a
+vectorFromSparseVector sv@(idx,val) size d = Acc.map m def
   where
-    def         = use $ fromList (Z :. size) $ take size $ repeat 0
-    transfer ix = unindex1 ix
--}
+    def = use $ fromList (Z :. size) $ take size $ [1,2..] :: AccVector Int
+    --
+    m i = getEntry i d sv 
 
 -- mpcgMultiInitialAcc :: AccMultiSparseMatrix Float -> AccMultiVector Float -> AccMultiVector Float -> AccMultiVector Float -> Float -> Int -> Int -> AccThreeTupleVector
 -- mpcgMultiInitialAcc a b z p epsilon n eqcount = Acc.map f eqcount'
