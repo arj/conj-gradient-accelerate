@@ -7,6 +7,11 @@ import Data.Array.Accelerate.Math.SMVM
 import Data.Array.Accelerate.Types
 import Data.Array.Accelerate.Interpreter as I
 import Debug.Trace (trace)
+import Prelude hiding (replicate, zip, unzip, map, scanl, scanl1, scanr, scanr1, zipWith,
+                         filter, max, min, not, fst, snd, curry, uncurry, sum, head, tail,
+                         drop, take, null, length, reverse, init, last, product, minimum,
+                         maximum)
+import qualified Prelude
 
 traceShow a = trace (show a) a
 traceShowRun a = trace (show (I.run a)) a
@@ -64,84 +69,48 @@ mpcgInitialAcc a b z p epsilon n = mpcgSingleStep p_inv a dv r c delta delta0 ep
 
 -----------------------------------------------------------
 
--- TODO These function should probably be moved to a library
-
--- *********** Index manipulations
-
--- | Applys a function op with first operand beeing the shape in
--- the first dimension and the second operand beeing n and repacks
--- it in a shape.
-index1op :: Exp (Z :. Int) -> (Exp Int -> t -> Exp Int) -> t -> Exp (Z :. Int)
-index1op ix op n = index1 (op (unindex1 ix) n)
-
--- | Gets the index of a value in a vector.
--- Requires that the element searched for is unique!
--- TODO Fetch first index of element?
-{-indexOf :: (Elt a, Shape ix) => a -> AccVector a -> Exp ix
-indexOf val xs =
-  where
-    idxs      = generate (shape xs) unindex1
-    selectIdx = Acc.zipWith -}
-
--- *********** Actions on Acc Vectors
-
-accSum :: (Elt a, IsNum a) => AccVector a -> AccScalar a
-accSum xs = Acc.foldAll (+) 0 xs
-
-accHead :: (Elt a) => AccVector a -> AccScalar a
-accHead xs = Acc.reshape (lift Z) $ Acc.backpermute (index1 1) (\x -> x) xs
-
-accTail :: (Elt a) => AccVector a -> AccVector a
-accTail = accDrop 1
-
-accTake :: (Elt a) => Exp Int -> AccVector a -> AccVector a
-accTake n xs = Acc.backpermute (index1 n) (\x -> x) xs
-
-accDrop :: (Elt a) => Exp Int -> AccVector a -> AccVector a
-accDrop n xs = Acc.backpermute (index1op (shape xs) (-) n) (\i -> index1op i (+) n) xs
-
-
-
-
 -- (Segments, Indices, Values)
-type AccMultiSparseMatrix a = (AccSparseMatrix Int, (AccSparseMatrix Int, AccSparseMatrix a))
+type AccMultiSparseMatrix a = (AccSparseMatrix Int, (AccSparseMatrix Int, AccSparseMatrix a), AccVector Int)
 
 type AccThreeTupleVector = Acc (Vector (Int,Int,Int))
 
 -- | Extracts a row from a sparse matrix
 --   n is 0-based
 extractRow :: (Elt a) => Exp Int -> AccSparseMatrix a -> AccSparseVector a
-extractRow n (segs, (idxs, vals)) = (takerow idxs, takerow vals)
+extractRow n (segs, (idxs, vals), cols) = (takerow idxs, takerow vals, cols)
   where
-    before     = the $ accSum $ accTake n segs
+    before     = the $ sum $ take n segs
     count      = segs Acc.! (index1 n)
-    takerow xs = accTake count $ accDrop before xs
+    takerow xs = take count $ drop before xs
 
--- | Fetches an entry from a sparse vector.
-getEntry :: (Elt a) => Exp Int -> a -> AccSparseVector a -> Exp a
-getEntry i d (idx,val) = Acc.snd $ the $ Acc.foldAll f def xs
+mpcgMultiInitialAcc :: AccMultiSparseMatrix Float -> AccSparseMatrix Float -> AccSparseMatrix Float -> Acc (Array DIM2 Float) -> Float -> Int -> Int -> AccThreeTupleVector
+mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) allb allz allp epsilon n eqcount = Acc.map f eqcount'
   where
-    xs  = Acc.zip idx val
-    def = constant (0,d)
-    f ack v = (i ==* Acc.fst v) ? (v, ack)
-
--- | Creates a vector from a sparse vector
-vectorFromSparseVector :: (Elt a) => AccSparseVector a -> Int -> a -> AccVector a
-vectorFromSparseVector sv@(idx,val) size d = Acc.map m def
-  where
-    def = use $ fromList (Z :. size) $ take size $ [1,2..] :: AccVector Int
-    --
-    m i = getEntry i d sv 
-
--- mpcgMultiInitialAcc :: AccMultiSparseMatrix Float -> AccMultiVector Float -> AccMultiVector Float -> AccMultiVector Float -> Float -> Int -> Int -> AccThreeTupleVector
--- mpcgMultiInitialAcc a b z p epsilon n eqcount = Acc.map f eqcount'
-mpcgMultiInitialAcc epsilon n eqcount = Acc.map f eqcount'
-  where
-    eqcount' = use $ fromList (Z :. eqcount) [1..eqcount] :: AccVector Int
+    eqcount' = use $ fromList (Z :. eqcount) [0..eqcount-1] :: AccVector Int
     --
     f :: Exp Int -> Exp (Plain (Int,Int,Int))
-    f i = lift (n,n,n)
+    f i = lift (i,i,i)
+      where
+        segs = extractRow i allsegs
+        idxs = extractRow i allidxs
+        vals = extractRow i allvals
+        cols = allcols ! index1 i
+        -- Extracting all the rows
+        a    = (segs, (idxs, vals), cols)
+        b    = extractRow i allb
+        z    = extractRow i allz
+        p    = slice allp (lift (Z :. i :. All))
+        -- Real initialization
+        p_inv   = vectorInverseAcc p
+        dv      = z
+        --delta0  = sparseDotPacc (filterMPCG b) (p *^ b)
+        --r       = (Acc.zipWith (-) b (smvmAcc a dv))
+        --c       = p_inv *^ r
+        --delta   = dotpAcc r c
 
+--        calc = mpcgMultiSingleStep
+       
+        
 -----------------------------------------------------------
 
 test n = mpcgInitial a b z p e n
@@ -167,5 +136,24 @@ getArgs = (a,b,z,p)
   where
     a = usesm $ fromArrayZero $ fromList (Z :. (3 :: Int) :. (3 :: Int)) ([1,1,1,1,5,1,1,1,1] :: [Float])
     b = use $ fromList (Z :. (3 :: Int)) ([6,14,6] :: [Float])
-    z = use $ fromList (Z :. (3 :: Int)) ([0,0,0] :: [Float]) 
+    z = use $ fromList (Z :. (3 :: Int)) ([0,0,0] :: [Float])
     p = use $ fromList (Z :. (3 :: Int)) ([1,5,1] :: [Float])
+
+----------------------------------------
+-- CURRENTLY NOT USED
+
+-- | Fetches an entry from a sparse vector.
+getEntry :: (Elt a) => Exp Int -> a -> AccSparseVector a -> Exp a
+getEntry i d (idx,val,_) = Acc.snd $ the $ Acc.foldAll f def xs
+  where
+    xs  = Acc.zip idx val
+    def = constant (0,d)
+    f ack v = (i ==* Acc.fst v) ? (v, ack)
+
+-- | Creates a vector from a sparse vector
+vectorFromSparseVector :: (Elt a) => AccSparseVector a -> Int -> a -> AccVector a
+vectorFromSparseVector sv@(idx,val,_) size d = Acc.map m def
+  where
+    def = use $ fromList (Z :. size) [1..size]
+    --
+    m i = getEntry i d sv 
