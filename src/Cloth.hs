@@ -72,7 +72,7 @@ mpcgInitialAcc a b z p epsilon n = mpcgSingleStep p_inv a dv r c delta delta0 ep
 -- (Segments, Indices, Values)
 type AccMultiSparseMatrix a = (AccSparseMatrix Int, (AccSparseMatrix Int, AccSparseMatrix a), AccVector Int)
 
-type AccThreeTupleVector = Acc (Vector (Int,Int,Int))
+type AccThreeTupleVector = Acc (Vector (Float,Float,Float))
 
 -- | Extracts a row from a sparse matrix
 --   n is 0-based
@@ -88,28 +88,19 @@ mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) allb allz allp epsi
   where
     eqcount' = use $ fromList (Z :. eqcount) [0..eqcount-1] :: AccVector Int
     --
-    f :: Exp Int -> Exp (Plain (Int,Int,Int))
-    f i = lift (i,i,i)
+    f :: Exp Int -> Exp (Float,Float,Float)
+    f i = lift (res ! index1 0, res ! index1 1, res ! index1 2)
       where
-        segs = extractRow i allsegs
-        idxs = extractRow i allidxs
-        vals = extractRow i allvals
+        segs = vectorFromSparseVector 0 $ extractRow i allsegs
+        idxs = vectorFromSparseVector 0 $ extractRow i allidxs
+        vals = vectorFromSparseVector 0 $ extractRow i allvals
         cols = allcols ! index1 i
         -- Extracting all the rows
-        a    = (segs, (idxs, vals), cols)
-        b    = extractRow i allb
-        z    = extractRow i allz
+        a    = (segs, (idxs, vals), unit cols)
+        b    = vectorFromSparseVector 0 $ extractRow i allb
+        z    = vectorFromSparseVector 0 $ extractRow i allz
         p    = slice allp (lift (Z :. i :. All))
-        -- Real initialization
-        p_inv   = vectorInverseAcc p
-        dv      = z
-        --delta0  = sparseDotPacc (filterMPCG b) (p *^ b)
-        --r       = (Acc.zipWith (-) b (smvmAcc a dv))
-        --c       = p_inv *^ r
-        --delta   = dotpAcc r c
-
---        calc = mpcgMultiSingleStep
-       
+        res  = mpcgInitialAcc a b z p epsilon n
         
 -----------------------------------------------------------
 
@@ -142,18 +133,45 @@ getArgs = (a,b,z,p)
 ----------------------------------------
 -- CURRENTLY NOT USED
 
+
+-- | Returns the index in the array for a sparse vector entry.
+getIndexEntry :: (Elt a) => Exp Int -> AccSparseVector a -> Exp Int
+getIndexEntry i (idx,_,_) = fst $ scanr f def xs ! index1 0
+  where
+    def = constant (-1,0) :: Exp (Int, Int)
+    idxes = generate (lift (Z :. size idx)) unindex1
+    xs  = Acc.zip idxes idx
+    --
+    f :: Exp (Int, Int) -> Exp (Int, Int) -> Exp (Int, Int)
+    f ack v = let (no, idx) = unlift v :: (Exp Int, Exp Int) in
+              (i ==* idx) ? (v, ack)
+
+
 -- | Fetches an entry from a sparse vector.
-getEntry :: (Elt a) => Exp Int -> a -> AccSparseVector a -> Exp a
-getEntry i d (idx,val,_) = Acc.snd $ the $ Acc.foldAll f def xs
+getEntry :: (Elt a) => Exp Int -> a -> AccSparseVector a -> AccScalar a
+getEntry i d (idx,val,_) = let array = Acc.foldAll f def xs in
+                           let (_,v) = Acc.unzip array in
+                           v
   where
     xs  = Acc.zip idx val
     def = constant (0,d)
     f ack v = (i ==* Acc.fst v) ? (v, ack)
 
--- | Creates a vector from a sparse vector
-vectorFromSparseVector :: (Elt a) => AccSparseVector a -> Int -> a -> AccVector a
-vectorFromSparseVector sv@(idx,val,_) size d = Acc.map m def
+
+
+vectorFromSparseVector :: (Elt a) => Exp a -> AccSparseVector a -> AccVector a
+vectorFromSparseVector d (idx,val,s) = permute const def f val
   where
-    def = use $ fromList (Z :. size) [1..size]
+    def = generate (index1 $ the s) (\_ -> d)
     --
-    m i = getEntry i d sv 
+    f ix = index1 (idx ! ix)
+
+
+
+
+idx1 = use $ fromList (Z :. 3) [1,2,5] :: AccVector Int
+val1 = use $ fromList (Z :. 3) [1,2,3] :: AccVector Float
+
+sv1 = (idx1, val1, unit 6 :: AccScalar Int)
+
+
