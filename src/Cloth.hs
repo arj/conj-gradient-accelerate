@@ -69,59 +69,64 @@ mpcgInitialAcc a b z p epsilon n = mpcgSingleStep p_inv a dv r c delta delta0 ep
 
 -----------------------------------------------------------
 
--- (Segments, Indices, Values)
-type AccMultiSparseMatrix a = (AccSparseMatrix Int, (AccSparseMatrix Int, AccSparseMatrix a), AccVector Int)
+type AccMultiMatrix a = (AccMatrix Int, (AccMatrix Int, AccMatrix a), AccVector Int)
 
-type AccThreeTupleVector a = Acc (Vector (a,a,a))
+type AccMatrix a = Acc (Array DIM2 a)
 
--- | Extracts a row from a sparse matrix
---   n is 0-based
-extractRow :: (Elt a) => Exp Int -> AccSparseMatrix a -> AccSparseVector a
-extractRow n (segs, (idxs, vals), cols) = (takerow idxs, takerow vals, cols)
+
+mpcgMultiSingleStep :: AccMatrix Float -> AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccVector Float -> AccVector Float -> Float -> Int -> AccMatrix Float
+mpcgMultiSingleStep p_inv a dv r_in c delta delta0 epsilon n -- = dv
+  | n == 0  = dv
+--  | otherwise = cond ?| (mpcgMultiSingleStep p_inv a dv' r' c' delta' delta0 epsilon (pred n), dv)
+  | otherwise = mpcgMultiSingleStep p_inv a dv' r' c' delta' delta0 epsilon (pred n)
   where
-    before     = the $ sum $ take n segs
-    count      = segs Acc.! (index1 n)
-    takerow xs = take count $ drop before xs
-
---------------------------------------
-
-mpcgMultiInitialAcc :: AccMultiSparseMatrix Float -> AccSparseMatrix Float -> AccSparseMatrix Float -> Acc (Array DIM2 Float) -> Float -> Int -> Int -> AccThreeTupleVector Int
-mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) allb allz allp epsilon n eqcount = Acc.map f eqcount'
-  where
-    eqcount' = use $ fromList (Z :. eqcount) [0..eqcount-1] :: AccVector Int
+{-    epsilon_l = lift epsilon
+    cond      = (>*) (the delta) (epsilon_l * epsilon_l * (the delta0))-}
+    q         = smvmMulti a c  :: AccMatrix Float
+    p_cq      = Acc.fold (+) 0 $ Acc.zipWith (*) c q :: AccVector Float
+    alpha     = Acc.zipWith (/) delta p_cq :: AccVector Float
+    alpha_c   = Acc.zipWith (*) (expand alpha) c  :: AccMatrix Float
+    dv'       = Acc.zipWith (+) dv alpha_c :: AccMatrix Float
+    alpha_q   = Acc.zipWith (*) (expand alpha) q :: AccMatrix Float
+    r         = Acc.zipWith (-) r_in alpha_q :: AccMatrix Float
+    s         = Acc.zipWith (*) p_inv r :: AccMatrix Float
+    delta'    = Acc.fold (+) 0 $ Acc.zipWith (*) r s :: AccVector Float
+    beta      = Acc.zipWith (/) delta' delta :: AccVector Float
+    beta_c    = Acc.zipWith (*) (expand beta) c :: AccMatrix Float
+    c'        = Acc.zipWith (+) s beta_c :: AccMatrix Float -- filter
+    r' = r :: AccMatrix Float
     --
-    f :: Exp Int -> Exp (Int, Int, Int) -- Exp (Float,Float,Float)
-    f i = lift (i,i,i)-- lift (res ! index1 0, res ! index1 1, res ! index1 2)
-      where
-        segs = vectorFromSparseVector 0 $ extractRow i allsegs
-        idxs = vectorFromSparseVector 0 $ extractRow i allidxs
-        vals = vectorFromSparseVector 0 $ extractRow i allvals
-        cols = allcols ! index1 i
-        -- Extracting all the rows
-        a    = (segs, (idxs, vals), unit cols)
-        b    = vectorFromSparseVector 0 $ extractRow i allb
-        z    = vectorFromSparseVector 0 $ extractRow i allz
-        p    = slice allp (lift (Z :. i :. All))
-        res  = mpcgInitialAcc a b z p epsilon n
-        
+    expand a  = replicate (lift (Z:.All:.3 :: Z:.All:.Int)) a
 
-----
 
---testmpcgMultiInitialAcc = mpcgMultiInitialAcc alla allb allz allp epsilon n eqcount
-testmpcgMultiInitialAcc = (alla,allb,allz,allp,epsilon,n,eqcount)
+mpcgMultiInitialAcc :: AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> Float -> Int -> Int -> AccMatrix Float
+mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n eqcount = mpcgMultiSingleStep p_inv a dv r c delta delta0 epsilon n
   where
-    allsegs = usesm $ fromArray 0 $ fromList (Z :. 2 :. 3) [3,3,3,3,3,3] :: AccSparseMatrix Int
-    allidxs = usesm $ fromArray 0 $ fromList (Z :. 2 :. 9) [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,0,1,2] :: AccSparseMatrix Int
-    allvals = usesm $ fromArrayZero $ fromList (Z :. 2 :. 9) [1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0] :: AccSparseMatrix Float
+    p_inv  = Acc.map (1/) p
+    dv     = z
+    delta0 = Acc.fold (+) 0 $ Acc.zipWith (*) b $ Acc.zipWith (*) p b -- filter
+    r      = Acc.zipWith (-) b $ smvmMulti a dv  -- filter
+    c      = Acc.zipWith (*) p r -- filter
+    delta  = Acc.fold (+) 0 $ Acc.zipWith (*) r c
+
+
+-- TESTS --
+
+testmpcgMulti2 n = mpcgMultiInitialAcc a b z p epsilon n eqcount
+  where
+    allsegs = use $ fromList (Z :. 2 :. 3) [3,3,3,3,3,3] :: AccMatrix Int
+    allidxs = use $ fromList (Z :. 2 :. 9) [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,0,1,2] :: AccMatrix Int
+    allvals = use $ fromList (Z :. 2 :. 9) [1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0] :: AccMatrix Float
     allcols = use $ fromList (Z :. 3) [3,3,3] :: AccVector Int
     --
-    alla = (allsegs,(allidxs,allvals),allcols)
-    allb = usesm $ fromArrayZero $ fromList (Z :. 2 :. 3) [6,14,6,6,14,6] :: AccSparseMatrix Float
-    allz = usesm $ fromArrayZero $ fromList (Z :. 2 :. 3) [0,0,0,0,0,0] :: AccSparseMatrix Float
-    allp = use $ fromList (Z :. 2 :. 3) [1,5,1,1,5,1] :: Acc (Array DIM2 Float)
+    a = (allsegs,(allidxs,allvals),allcols)
+    b = use $ fromList (Z :. 2 :. 3) [6,14,6,6,14,6] :: AccMatrix Float
+    z = use $ fromList (Z :. 2 :. 3) [0,0,0,0,0,0] :: AccMatrix Float
+    p = use $ fromList (Z :. 2 :. 3) [1,5,1,1,5,1] :: Acc (Array DIM2 Float)
     epsilon = 0.0000001
-    n = 0
     eqcount = 2
+
+
 
 -----------------------------------------------------------
 
@@ -194,4 +199,40 @@ val1 = use $ fromList (Z :. 3) [1,2,3] :: AccVector Float
 
 sv1 = (idx1, val1, unit 6 :: AccScalar Int)
 
+---------
+
+allsegs = usesm $ fromArray 0 $ fromList (Z :. 2 :. 3) [3,3,3,3,3,3] :: AccSparseMatrix Int
+allidxs = usesm $ fromArray 0 $ fromList (Z :. 2 :. 9) [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,0,1,2] :: AccSparseMatrix Int
+allvals = usesm $ fromArrayZero $ fromList (Z :. 2 :. 9) [1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0] :: AccSparseMatrix Float
+allcols = use $ fromList (Z :. 3) [3,3,3] :: AccVector Int
+--
+alla = (allsegs,(allidxs,allvals),allcols)
+allb = usesm $ fromArrayZero $ fromList (Z :. 2 :. 3) [6,14,6,6,14,6] :: AccSparseMatrix Float
+allz = usesm $ fromArrayZero $ fromList (Z :. 2 :. 3) [0,0,0,0,0,0] :: AccSparseMatrix Float
+allp = use $ fromList (Z :. 2 :. 3) [1,5,1,1,5,1] :: Acc (Array DIM2 Float)
+
+
+-- Unused indices, values, and segments have to be set to 0.
+smvmMulti :: AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float
+smvmMulti (segs, (idxs, vals), cnt) vecs = reshape (shape vecs) $ foldSeg (+) 0 (flatten products) (flatten segs)
+  where
+    vecVals         = backpermute (shape idxs) (\ix -> index2 (fst $ unindex2 ix) $ idxs Acc.! ix) vecs
+    products        = Acc.zipWith (*) vecVals vals
+
+
+index2 :: Exp Int -> Exp Int -> Exp DIM2
+index2 i j      = lift (Z :. i :. j)
+
+unindex2 :: Exp DIM2 -> Exp (Int, Int)
+unindex2 ix     = let Z :. i :. j = unlift (ix :: Exp DIM2) in lift ((i,j) :: (Exp Int, Exp Int))
+
+
+--
+smvmTest = smvmMulti (segd,(idxs,vals),cnts) vecs
+  where
+    segd = use $ fromList (Z:.2:.3) [2,1,1,0,2,1] :: Acc (Array DIM2 Int)
+    idxs = use $ fromList (Z:.2:.4) [0,2,2,0,1,2,0,0] :: Acc (Array DIM2 Int)
+    vals = use $ fromList (Z:.2:.4) [1,5,3,2,1,1,1,0] :: Acc (Array DIM2 Float)
+    cnts = use $ fromList (Z:.2) [3,3] :: Acc (Array DIM1 Int)
+    vecs = use $ fromList (Z:.2:.3) [1,2,3,4,5,6] :: Acc (Array DIM2 Float)
 
