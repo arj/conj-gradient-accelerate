@@ -1,7 +1,7 @@
 {-#LANGUAGE TypeOperators #-}
 module Cloth where
 
-import Data.Array.Accelerate as Acc
+import Data.Array.Accelerate as Acc hiding (flatten)
 import Data.Array.Accelerate.Math
 import Data.Array.Accelerate.Math.SMVM
 import Data.Array.Accelerate.Types
@@ -226,6 +226,10 @@ index2 i j      = lift (Z :. i :. j)
 unindex2 :: Exp DIM2 -> Exp (Int, Int)
 unindex2 ix     = let Z :. i :. j = unlift (ix :: Exp DIM2) in lift ((i,j) :: (Exp Int, Exp Int))
 
+-- | Flattens a given array of arbitrary dimension.
+--
+flatten :: (Shape ix, Elt a) => Acc (Array ix a) -> Acc (Array DIM1 a)
+flatten a = reshape (index1 $ size a) a
 
 --
 smvmTest = smvmMulti (segd,(idxs,vals),cnts) vecs
@@ -235,4 +239,5 @@ smvmTest = smvmMulti (segd,(idxs,vals),cnts) vecs
     vals = use $ fromList (Z:.2:.4) [1,5,3,2,1,1,1,0] :: Acc (Array DIM2 Float)
     cnts = use $ fromList (Z:.2) [3,3] :: Acc (Array DIM1 Int)
     vecs = use $ fromList (Z:.2:.3) [1,2,3,4,5,6] :: Acc (Array DIM2 Float)
+
 
