@@ -10,7 +10,7 @@ import Debug.Trace (trace)
 import Prelude hiding (replicate, zip, unzip, map, scanl, scanl1, scanr, scanr1, zipWith,
                          filter, max, min, not, fst, snd, curry, uncurry, sum, head, tail,
                          drop, take, null, length, reverse, init, last, product, minimum,
-                         maximum)
+                         maximum,zip3)
 import qualified Prelude
 
 traceShow a = trace (show a) a
@@ -74,14 +74,12 @@ type AccMultiMatrix a = (AccMatrix Int, (AccMatrix Int, AccMatrix a), AccVector 
 type AccMatrix a = Acc (Array DIM2 a)
 
 
-mpcgMultiSingleStep :: AccMatrix Float -> AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccVector Float -> AccVector Float -> Float -> Int -> AccMatrix Float
-mpcgMultiSingleStep p_inv a dv r_in c delta delta0 epsilon n -- = dv
+mpcgMultiSingleStep :: AccMatrix Float -> AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> Int -> AccMatrix Float
+mpcgMultiSingleStep p_inv a dv r_in c delta delta0 e_sq n -- = dv
   | n == 0  = dv
---  | otherwise = cond ?| (mpcgMultiSingleStep p_inv a dv' r' c' delta' delta0 epsilon (pred n), dv)
-  | otherwise = mpcgMultiSingleStep p_inv a dv' r' c' delta' delta0 epsilon (pred n)
+  | otherwise = mpcgMultiSingleStep p_inv a dv_cond r' c' delta' delta0 e_sq (pred n)
   where
-{-    epsilon_l = lift epsilon
-    cond      = (>*) (the delta) (epsilon_l * epsilon_l * (the delta0))-}
+    cond      = Acc.zipWith (-) delta $ Acc.zipWith (*) delta0 e_sq -- > 0 another round, <= 0 otherwise 
     q         = smvmMulti a c  :: AccMatrix Float
     p_cq      = Acc.fold (+) 0 $ Acc.zipWith (*) c q :: AccVector Float
     alpha     = Acc.zipWith (/) delta p_cq :: AccVector Float
@@ -94,21 +92,26 @@ mpcgMultiSingleStep p_inv a dv r_in c delta delta0 epsilon n -- = dv
     beta      = Acc.zipWith (/) delta' delta :: AccVector Float
     beta_c    = Acc.zipWith (*) (expand beta) c :: AccMatrix Float
     c'        = Acc.zipWith (+) s beta_c :: AccMatrix Float -- filter
-    r' = r :: AccMatrix Float
+    r'        = r :: AccMatrix Float
+    conddvdv' = zip3 (expand cond) dv dv'
+    dv_cond   = Acc.map condfun conddvdv'
     --
     expand a  = replicate (lift (Z:.All:.3 :: Z:.All:.Int)) a
+    --
+    condfun a = let (cond,dv,dv') = unlift a :: (Exp Float, Exp Float, Exp Float) in
+                (cond >* 0) ? (dv',dv)
 
 
 mpcgMultiInitialAcc :: AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> Float -> Int -> Int -> AccMatrix Float
-mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n eqcount = mpcgMultiSingleStep p_inv a dv r c delta delta0 epsilon n
+mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n eqcount = mpcgMultiSingleStep p_inv a dv r c delta delta0 e_sq n
   where
     p_inv  = Acc.map (1/) p
     dv     = z
     delta0 = Acc.fold (+) 0 $ Acc.zipWith (*) b $ Acc.zipWith (*) p b -- filter
     r      = Acc.zipWith (-) b $ smvmMulti a dv  -- filter
-    c      = Acc.zipWith (*) p r -- filter
+    c      = Acc.zipWith (*) p_inv r -- filter
     delta  = Acc.fold (+) 0 $ Acc.zipWith (*) r c
-
+    e_sq   = replicate (shape delta0) $ unit $ constant $ epsilon * epsilon
 
 -- TESTS --
 
@@ -125,8 +128,6 @@ testmpcgMulti2 n = mpcgMultiInitialAcc a b z p epsilon n eqcount
     p = use $ fromList (Z :. 2 :. 3) [1,5,1,1,5,1] :: Acc (Array DIM2 Float)
     epsilon = 0.0000001
     eqcount = 2
-
-
 
 -----------------------------------------------------------
 
@@ -230,6 +231,17 @@ unindex2 ix     = let Z :. i :. j = unlift (ix :: Exp DIM2) in lift ((i,j) :: (E
 --
 flatten :: (Shape ix, Elt a) => Acc (Array ix a) -> Acc (Array DIM1 a)
 flatten a = reshape (index1 $ size a) a
+
+
+-- | Takes three arrays and produces an array of a three-tuple.
+--   TODO Maybe there is a better way to implement this but with 2 zips?!
+--
+zip3 :: forall a b c sh. (Shape sh, Elt c, Elt b, Elt a) =>
+     Acc (Array sh a) -> Acc (Array sh b) -> Acc (Array sh c) -> Acc (Array sh (a, b, c))
+zip3 a b c = Acc.zipWith f a $ Acc.zip b c
+  where
+    f a bc = let (b,c) = unlift bc :: (Exp b, Exp c) in
+             lift (a, b, c) :: Exp (a,b,c)
 
 --
 smvmTest = smvmMulti (segd,(idxs,vals),cnts) vecs
