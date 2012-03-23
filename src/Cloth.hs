@@ -75,7 +75,7 @@ type AccMatrix a = Acc (Array DIM2 a)
 
 
 mpcgMultiSingleStep :: AccMatrix Float -> AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> Int -> AccMatrix Float
-mpcgMultiSingleStep p_inv a dv r_in c delta delta0 e_sq n -- = dv
+mpcgMultiSingleStep p_inv a dv r_in c delta delta0 e_sq n
   | n == 0  = dv
   | otherwise = mpcgMultiSingleStep p_inv a dv_cond r c' delta' delta0 e_sq (pred n)
   where
@@ -111,6 +111,7 @@ mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n eqc
     c      = Acc.zipWith (*) p_inv r -- filter
     delta  = Acc.fold (+) 0 $ Acc.zipWith (*) r c
     e_sq   = replicate (shape delta0) $ unit $ constant $ epsilon * epsilon
+
 
 -- TESTS --
 
@@ -148,70 +149,6 @@ testAcc n = mpcgInitialAcc a b z p e n
     e = 0.0000000001
 ----
 
-getArgs = (a,b,z,p)
-  where
-    a = usesm $ fromArrayZero $ fromList (Z :. (3 :: Int) :. (3 :: Int)) ([1,1,1,1,5,1,1,1,1] :: [Float])
-    b = use $ fromList (Z :. (3 :: Int)) ([6,14,6] :: [Float])
-    z = use $ fromList (Z :. (3 :: Int)) ([0,0,0] :: [Float])
-    p = use $ fromList (Z :. (3 :: Int)) ([1,5,1] :: [Float])
-
-----------------------------------------
--- CURRENTLY NOT USED
-
-
--- | Returns the index in the array for a sparse vector entry.
-getIndexEntry :: (Elt a) => Exp Int -> AccSparseVector a -> Exp Int
-getIndexEntry i (idx,_,_) = fst $ scanr f def xs ! index1 0
-  where
-    def = constant (-1,0) :: Exp (Int, Int)
-    idxes = generate (lift (Z :. size idx)) unindex1
-    xs  = Acc.zip idxes idx
-    --
-    f :: Exp (Int, Int) -> Exp (Int, Int) -> Exp (Int, Int)
-    f ack v = let (no, idx) = unlift v :: (Exp Int, Exp Int) in
-              (i ==* idx) ? (v, ack)
-
-
--- | Fetches an entry from a sparse vector.
-getEntry :: (Elt a) => Exp Int -> a -> AccSparseVector a -> AccScalar a
-getEntry i d (idx,val,_) = let array = Acc.foldAll f def xs in
-                           let (_,v) = Acc.unzip array in
-                           v
-  where
-    xs  = Acc.zip idx val
-    def = constant (0,d)
-    f ack v = (i ==* Acc.fst v) ? (v, ack)
-
-
-
-vectorFromSparseVector :: (Elt a) => Exp a -> AccSparseVector a -> AccVector a
-vectorFromSparseVector d (idx,val,s) = permute const def f val
-  where
-    def = generate (index1 $ the s) (\_ -> d)
-    --
-    f ix = index1 (idx ! ix)
-
-
-
-
-idx1 = use $ fromList (Z :. 3) [1,2,5] :: AccVector Int
-val1 = use $ fromList (Z :. 3) [1,2,3] :: AccVector Float
-
-sv1 = (idx1, val1, unit 6 :: AccScalar Int)
-
----------
-
-allsegs = usesm $ fromArray 0 $ fromList (Z :. 2 :. 3) [3,3,3,3,3,3] :: AccSparseMatrix Int
-allidxs = usesm $ fromArray 0 $ fromList (Z :. 2 :. 9) [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,0,1,2] :: AccSparseMatrix Int
-allvals = usesm $ fromArrayZero $ fromList (Z :. 2 :. 9) [1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0] :: AccSparseMatrix Float
-allcols = use $ fromList (Z :. 3) [3,3,3] :: AccVector Int
---
-alla = (allsegs,(allidxs,allvals),allcols)
-allb = usesm $ fromArrayZero $ fromList (Z :. 2 :. 3) [6,14,6,6,14,6] :: AccSparseMatrix Float
-allz = usesm $ fromArrayZero $ fromList (Z :. 2 :. 3) [0,0,0,0,0,0] :: AccSparseMatrix Float
-allp = use $ fromList (Z :. 2 :. 3) [1,5,1,1,5,1] :: Acc (Array DIM2 Float)
-
-
 -- Unused indices, values, and segments have to be set to 0.
 smvmMulti :: AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float
 smvmMulti (segs, (idxs, vals), cnt) vecs = reshape (shape vecs) $ foldSeg (+) 0 (flatten products) (flatten segs)
@@ -241,14 +178,3 @@ zip3 a b c = Acc.zipWith f a $ Acc.zip b c
   where
     f a bc = let (b,c) = unlift bc :: (Exp b, Exp c) in
              lift (a, b, c) :: Exp (a,b,c)
-
---
-smvmTest = smvmMulti (segd,(idxs,vals),cnts) vecs
-  where
-    segd = use $ fromList (Z:.2:.3) [2,1,1,0,2,1] :: Acc (Array DIM2 Int)
-    idxs = use $ fromList (Z:.2:.4) [0,2,2,0,1,2,0,0] :: Acc (Array DIM2 Int)
-    vals = use $ fromList (Z:.2:.4) [1,5,3,2,1,1,1,0] :: Acc (Array DIM2 Float)
-    cnts = use $ fromList (Z:.2) [3,3] :: Acc (Array DIM1 Int)
-    vecs = use $ fromList (Z:.2:.3) [1,2,3,4,5,6] :: Acc (Array DIM2 Float)
-
-
