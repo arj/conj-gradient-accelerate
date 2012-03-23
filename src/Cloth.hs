@@ -116,6 +116,7 @@ mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n = m
 -- * Helper functions. Should be put in Acc Prelude.
 
 -- Unused indices, values, and segments have to be set to 0.
+-- All segments must be given!
 smvmMulti :: AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float
 smvmMulti (segs, (idxs, vals), cnt) vecs = reshape (shape vecs) $ foldSeg (+) 0 (flatten products) (flatten segs)
   where

@@ -22,7 +22,7 @@ testmpcgMulti2 n = mpcgMultiInitialAcc a b z p epsilon n
     allsegs = use $ fromList (Z :. 2 :. 3) [3,3,3,3,3,3] :: AccMatrix Int
     allidxs = use $ fromList (Z :. 2 :. 9) [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,0,1,2] :: AccMatrix Int
     allvals = use $ fromList (Z :. 2 :. 9) [1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0] :: AccMatrix Float
-    allcols = use $ fromList (Z :. 3) [3,3,3] :: AccVector Int
+    allcols = use $ fromList (Z :. 2) [3,3] :: AccVector Int
     --
     a = (allsegs,(allidxs,allvals),allcols)
     b = use $ fromList (Z :. 2 :. 3) [6,14,6,6,14,6] :: AccMatrix Float
@@ -65,3 +65,24 @@ testAcc n = mpcgInitialAcc a b z p e n
     p = use $ fromList (Z :. (3 :: Int)) ([1,5,1] :: [Float])
     e = 0.0000000001
 ----
+
+
+segs = use $ fromList (Z :. 2 :. 3) [2,1,1,0,0,0] :: AccMatrix Int
+idxs = use $ fromList (Z :. 2 :. 4) [0,2,2,0,0,0,0,0] :: AccMatrix Int
+vals = use $ fromList (Z :. 2 :. 4) [1,5,3,2,0,0,0,0] :: AccMatrix Float
+cols = use $ fromList (Z :. 2) [3,3] :: AccVector Int
+vecs = use $ fromList (Z :. 2 :. 3) [1,2,3,4,5,6] :: AccMatrix Float
+
+
+segs2 = use $ fromList (Z :. 2 :. 3) [0,0,0,0,0,0] :: AccMatrix Int
+idxs2 = use $ fromList (Z :. 2 :. 0) [] :: AccMatrix Int
+vals2 = use $ fromList (Z :. 2 :. 0) [] :: AccMatrix Float
+cols2 = use $ fromList (Z :. 2) [3,3] :: AccVector Int
+vecs2 = use $ fromList (Z :. 2 :. 3) [1,2,3,4,5,6] :: AccMatrix Float
+
+
+segs3 = use $ fromList (Z :. 1 :. 3) [1,1,0] :: AccMatrix Int
+idxs3 = use $ fromList (Z :. 1 :. 2) [1,1] :: AccMatrix Int
+vals3 = use $ fromList (Z :. 1 :. 2) [1,2] :: AccMatrix Float
+cols3 = use $ fromList (Z :. 1) [3] :: AccVector Int
+vecs3 = use $ fromList (Z :. 1 :. 3) [1,2,3] :: AccMatrix Float
