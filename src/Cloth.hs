@@ -77,22 +77,21 @@ type AccMatrix a = Acc (Array DIM2 a)
 mpcgMultiSingleStep :: AccMatrix Float -> AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> Int -> AccMatrix Float
 mpcgMultiSingleStep p_inv a dv r_in c delta delta0 e_sq n -- = dv
   | n == 0  = dv
-  | otherwise = mpcgMultiSingleStep p_inv a dv_cond r' c' delta' delta0 e_sq (pred n)
+  | otherwise = mpcgMultiSingleStep p_inv a dv_cond r c' delta' delta0 e_sq (pred n)
   where
     cond      = Acc.zipWith (-) delta $ Acc.zipWith (*) delta0 e_sq -- > 0 another round, <= 0 otherwise 
-    q         = smvmMulti a c  :: AccMatrix Float
-    p_cq      = Acc.fold (+) 0 $ Acc.zipWith (*) c q :: AccVector Float
-    alpha     = Acc.zipWith (/) delta p_cq :: AccVector Float
-    alpha_c   = Acc.zipWith (*) (expand alpha) c  :: AccMatrix Float
-    dv'       = Acc.zipWith (+) dv alpha_c :: AccMatrix Float
-    alpha_q   = Acc.zipWith (*) (expand alpha) q :: AccMatrix Float
-    r         = Acc.zipWith (-) r_in alpha_q :: AccMatrix Float
-    s         = Acc.zipWith (*) p_inv r :: AccMatrix Float
-    delta'    = Acc.fold (+) 0 $ Acc.zipWith (*) r s :: AccVector Float
-    beta      = Acc.zipWith (/) delta' delta :: AccVector Float
-    beta_c    = Acc.zipWith (*) (expand beta) c :: AccMatrix Float
-    c'        = Acc.zipWith (+) s beta_c :: AccMatrix Float -- filter
-    r'        = r :: AccMatrix Float
+    q         = smvmMulti a c
+    p_cq      = Acc.fold (+) 0 $ Acc.zipWith (*) c q
+    alpha     = Acc.zipWith (/) delta p_cq
+    alpha_c   = Acc.zipWith (*) (expand alpha) c
+    dv'       = Acc.zipWith (+) dv alpha_c
+    alpha_q   = Acc.zipWith (*) (expand alpha) q
+    r         = Acc.zipWith (-) r_in alpha_q
+    s         = Acc.zipWith (*) p_inv r
+    delta'    = Acc.fold (+) 0 $ Acc.zipWith (*) r s
+    beta      = Acc.zipWith (/) delta' delta
+    beta_c    = Acc.zipWith (*) (expand beta) c
+    c'        = Acc.zipWith (+) s beta_c -- filter
     conddvdv' = zip3 (expand cond) dv dv'
     dv_cond   = Acc.map condfun conddvdv'
     --
