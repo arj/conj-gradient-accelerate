@@ -101,8 +101,8 @@ mpcgMultiSingleStep p_inv a dv r_in c delta delta0 e_sq n
                 (cond >* 0) ? (dv',dv)
 
 
-mpcgMultiInitialAcc :: AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> Float -> Int -> Int -> AccMatrix Float
-mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n eqcount = mpcgMultiSingleStep p_inv a dv r c delta delta0 e_sq n
+mpcgMultiInitialAcc :: AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> Float -> Int -> AccMatrix Float
+mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n = mpcgMultiSingleStep p_inv a dv r c delta delta0 e_sq n
   where
     p_inv  = Acc.map (1/) p
     dv     = z
@@ -113,41 +113,7 @@ mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n eqc
     e_sq   = replicate (shape delta0) $ unit $ constant $ epsilon * epsilon
 
 
--- TESTS --
-
-testmpcgMulti2 n = mpcgMultiInitialAcc a b z p epsilon n eqcount
-  where
-    allsegs = use $ fromList (Z :. 2 :. 3) [3,3,3,3,3,3] :: AccMatrix Int
-    allidxs = use $ fromList (Z :. 2 :. 9) [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,0,1,2] :: AccMatrix Int
-    allvals = use $ fromList (Z :. 2 :. 9) [1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,5.0,1.0,1.0,1.0,1.0] :: AccMatrix Float
-    allcols = use $ fromList (Z :. 3) [3,3,3] :: AccVector Int
-    --
-    a = (allsegs,(allidxs,allvals),allcols)
-    b = use $ fromList (Z :. 2 :. 3) [6,14,6,6,14,6] :: AccMatrix Float
-    z = use $ fromList (Z :. 2 :. 3) [0,0,0,0,0,0] :: AccMatrix Float
-    p = use $ fromList (Z :. 2 :. 3) [1,5,1,1,5,1] :: Acc (Array DIM2 Float)
-    epsilon = 0.0000001
-    eqcount = 2
-
------------------------------------------------------------
-
-test n = mpcgInitial a b z p e n
-  where
-    a = fromArrayZero $ fromList (Z :. (3 :: Int) :. (3 :: Int)) ([1,1,1,1,5,1,1,1,1] :: [Float])
-    b = fromList (Z :. (3 :: Int)) ([6,14,6] :: [Float])
-    z = fromList (Z :. (3 :: Int)) ([0,0,0] :: [Float]) 
-    p = fromList (Z :. (3 :: Int)) ([1,5,1] :: [Float])
-    e = 0.0000000001
-
-
-testAcc n = mpcgInitialAcc a b z p e n
-  where
-    a = usesm $ fromArrayZero $ fromList (Z :. (3 :: Int) :. (3 :: Int)) ([1,1,1,1,5,1,1,1,1] :: [Float])
-    b = use $ fromList (Z :. (3 :: Int)) ([6,14,6] :: [Float])
-    z = use $ fromList (Z :. (3 :: Int)) ([0,0,0] :: [Float]) 
-    p = use $ fromList (Z :. (3 :: Int)) ([1,5,1] :: [Float])
-    e = 0.0000000001
-----
+-- * Helper functions. Should be put in Acc Prelude.
 
 -- Unused indices, values, and segments have to be set to 0.
 smvmMulti :: AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float
