@@ -1,4 +1,4 @@
-{-#LANGUAGE TypeOperators #-}
+{-#LANGUAGE TypeOperators,ScopedTypeVariables #-}
 module Cloth where
 
 import Data.Array.Accelerate as Acc hiding (flatten)
@@ -73,6 +73,8 @@ type AccMultiMatrix a = (AccMatrix Int, (AccMatrix Int, AccMatrix a), AccVector 
 
 type AccMatrix a = Acc (Array DIM2 a)
 
+expand :: Elt e => Acc (Array (Z :. Int) e) -> Acc (Array ((Z :. Int) :. Int) e)
+expand a  = replicate (lift (Z:.All:.3 :: Z:.All:.Int)) a
 
 mpcgMultiSingleStep :: AccMatrix Float -> AccMultiMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccMatrix Float -> AccVector Float -> AccVector Float -> AccVector Float -> Int -> AccMatrix Float
 mpcgMultiSingleStep p_inv a dv r_in c delta delta0 e_sq n
@@ -95,8 +97,6 @@ mpcgMultiSingleStep p_inv a dv r_in c delta delta0 e_sq n
     conddvdv' = zip3 (expand cond) dv dv'
     dv_cond   = Acc.map condfun conddvdv'
     --
-    expand a  = replicate (lift (Z:.All:.3 :: Z:.All:.Int)) a
-    --
     condfun a = let (cond,dv,dv') = unlift a :: (Exp Float, Exp Float, Exp Float) in
                 (cond >* 0) ? (dv',dv)
 
@@ -112,6 +112,126 @@ mpcgMultiInitialAcc a@(allsegs, (allidxs, allvals), allcols) b z p epsilon n = m
     delta  = Acc.fold (+) 0 $ Acc.zipWith (*) r c
     e_sq   = replicate (shape delta0) $ unit $ constant $ epsilon * epsilon
 
+
+-------------------------------------------------------
+
+-- Maybe use sparse matrices for particle state?
+generateParticles :: Int -> Int -> Acc (Array DIM2 Float)--, AccMatrix Int, AccMatrix Int)
+generateParticles m n = state
+  where
+    state = generate (lift (Z :. m*n :. 3 :: Z :. Int :. Int)) statefun
+    --
+    statefun ix = let ip = unindex2 ix in
+                let i = fst ip in
+                let p = snd ip in
+                let x = Acc.fromIntegral $ i `mod` constant m in
+                let y = Acc.fromIntegral $ i `div` constant m in
+                (p ==* 0) ? (x, (p ==* 1) ? (y, 0))
+                
+xyz [] = []                
+xyz ((x,y,z,dx,dy,dz) : xs) = (x,dx) : (y,dy) : (z,dz) : xyz xs
+
+-- Eq. 9, right part
+getInverseUVMatrix uv triangles = Acc.map f triangles
+  where
+    f :: Exp (Int, Int, Int) -> Exp (Float, Float, Float, Float)
+    f ijk = let (i,j,k) = unlift ijk :: (Exp Int, Exp Int, Exp Int) in
+            let (u_i,v_i) = unlift (uv ! index1 i) :: (Exp Float, Exp Float) in
+            let (u_j,v_j) = unlift (uv ! index1 j) :: (Exp Float, Exp Float) in
+            let (u_k,v_k) = unlift (uv ! index1 k) :: (Exp Float, Exp Float) in
+            let du1 = u_j - u_i in
+            let du2 = u_k - u_i in
+            let dv1 = v_j - v_i in
+            let dv2 = v_k - v_i in
+            let det = 1 / ((du1 * dv2) - (du2 * dv1)) in
+            lift (dv2/det, -du2/det, -dv1/det, du1/det) :: Exp (Float, Float, Float, Float)
+    
+
+getDefaultCloth :: (ParticleStates, AccVector (Float, Float), AccVector (Int, Int), AccVector (Int, Int, Int))
+getDefaultCloth = (states, uv, edges, triangles)
+  where
+    states = use $ fromList (Z :. 16 :. 3) $
+              xyz [(0,0,0,0,0,0),
+                  (1,0,0,0,0,0),
+                  (2,0,0,0,0,0),
+                  (3,0,0,0,0,0),
+                  (0,1,0,0,0,0),
+                  (1,1,0,0,0,0),
+                  (2,1,0,0,0,0),
+                  (3,1,0,0,0,0),
+                  (0,2,0,0,0,0),
+                  (1,2,0,0,0,0),
+                  (2,2,0,0,0,0),
+                  (3,2,0,0,0,0),
+                  (0,3,0,0,0,0),
+                  (1,3,0,0,0,0),
+                  (2,3,0,0,0,0),
+                  (3,3,0,0,0,0)] :: ParticleStates
+    uv    = use $ fromList (Z :. 16)
+                 [(0,0),
+                  (1,0),
+                  (2,0),
+                  (3,0),
+                  (0,1),
+                  (1,1),
+                  (2,1),
+                  (3,1),
+                  (0,2),
+                  (1,2),
+                  (2,2),
+                  (3,2),
+                  (0,3),
+                  (1,3),
+                  (2,3),
+                  (3,3)] :: AccVector (Float, Float)
+    edges = use $ fromList (Z :. 33)
+            [(0,4),(0,1),
+             (1,4),(1,5),(1,2),
+             (2,5),(2,6),(2,3),
+             (3,6),(3,7),
+             (4,8),(4,5),
+             (5,8),(5,9),(5,6),
+             (6,9),(6,10),(6,7),
+             (7,10),(7,11),
+             (8,12),(8,9),
+             (9,12),(9,13),(9,10),
+             (10,13),(10,14),(10,11),
+             (11,14),(11,15),
+             (12,13),(13,14),(14,15)] :: AccVector (Int, Int)
+    triangles = use $ fromList (Z :. 18) [(0,1,4),(1,5,4),(1,5,2),(2,6,5),(2,3,6),(3,7,6),
+                 (4,5,8),(5,9,8),(5,6,9),(6,10,9),(6,7,10),(7,11,10),
+                 (8,9,12),(9,13,12),(9,10,13),(10,14,13),(10,11,14),(11,15,14)] :: AccVector (Int,Int,Int)
+    
+
+
+
+-- TODO Implement subtraction for SparseMatrices!
+(|-|) a b = Acc.zipWith (-) a b
+(|*|) a b = Acc.zipWith (*) a b
+
+
+-- Stores (x,dx) (y,dy) (z,dz)
+type ParticleStates = AccMatrix (Float, Float)
+
+{-
+-- | Calculates one step for the particles to go
+step :: ParticleStates -> AccMatrix Int -> AccMatrix Int -> Int -> ParticleStates
+step state edges triangles h' = state'
+  where
+    pfv      = replicate (shape m) $ unit 0 
+    pfx      = replicate (shape m) $ unit 0 
+    h        = replicate (shape pfv) $ unit h'
+    h2       = replicate (shape pfv) $ unit (h' * h')
+    m        = replicate (
+    a        = m |-| (h |*| pfv) |-| (h2 |*| pfx) -- TODO SparseMatrix!
+    b        = 0
+    p        = 
+    z        = replicate (shape b) $ unit 0 -- TODO Really start with zero?
+    dv       = mpcgMultiInitialAcc a b p 0.0000001 10 -- TODO Add Filter!
+    state'   = Acc.map statemap $ Acc.zip state dv
+    --
+    statemap ((x,v),dv) = (x + h |*| (v |+| dv), v + dv)
+-- -}
 
 -- * Helper functions. Should be put in Acc Prelude.
 
