@@ -34,11 +34,19 @@ Executable conj-gradient-accelerate
 
 --  other-modules:
 
-  build-depends:        accelerate              == 0.9.1.*,
+  build-depends:        accelerate              == 0.10.*,
 --                        accelerate-cuda         == 0.9.*,
                         accelerate-matrices     == 0.1.*,
                         base                    == 4.*,
-                        fclabels                >= 1.0
+                        fclabels                >= 1.0,
+                        GLUT                    >= 2.3.0.0,
+                        GLURaw                  >= 1.2.0.0,
+                        GLUT                    >= 2.3.0.0,
+                        ObjectName              >= 1.0.0.0,
+                        OpenGL                  >= 2.5.0.0,
+                        OpenGLRaw               >= 1.2.0.0,
+                        StateVar                >= 1.0.0.0,
+                        Tensor                  >= 1.0.0.1
   if flag(cuda)
     CPP-options:        -DACCELERATE_CUDA_BACKEND
 
