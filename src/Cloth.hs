@@ -17,6 +17,8 @@ traceShow a = trace (show a) a
 traceShowRun a = trace (show (I.run a)) a
 traceShowRunStr s a = trace (s ++ "=" ++ (show (I.run a))) a
 
+-- | Implements the filter function as described in 5.3
+--
 filterMPCG :: AccVector Float -> AccVector Float
 filterMPCG v = v -- TODO Not implemented until now
 
