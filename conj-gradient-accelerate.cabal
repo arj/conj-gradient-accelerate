@@ -46,7 +46,8 @@ Executable conj-gradient-accelerate
                         OpenGL                  >= 2.5.0.0,
                         OpenGLRaw               >= 1.2.0.0,
                         StateVar                >= 1.0.0.0,
-                        Tensor                  >= 1.0.0.1
+                        Tensor                  >= 1.0.0.1,
+                        parsec                  >= 3.1.0.0
   if flag(cuda)
     CPP-options:        -DACCELERATE_CUDA_BACKEND
 

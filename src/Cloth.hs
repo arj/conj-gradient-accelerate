@@ -12,6 +12,7 @@ import Prelude hiding (replicate, zip, unzip, map, scanl, scanl1, scanr, scanr1,
                          drop, take, null, length, reverse, init, last, product, minimum,
                          maximum,zip3)
 import qualified Prelude
+import qualified Triangular
 
 traceShow a = trace (show a) a
 traceShowRun a = trace (show (I.run a)) a
@@ -149,8 +150,8 @@ getInverseUVMatrix uv triangles = Acc.map f triangles
             lift (dv2/det, -du2/det, -dv1/det, du1/det) :: Exp (Float, Float, Float, Float)
     
 
-getDefaultCloth :: (ParticleStates, AccVector (Float, Float), AccVector (Int, Int), AccVector (Int, Int, Int))
-getDefaultCloth = (states, uv, edges, triangles)
+getDefaultCloth :: (ParticleStates, AccVector (Float, Float), AccVector (Int, Int), AccVector (Int, Int, Int), AccMultiMatrix Float)
+getDefaultCloth = (states, uv, edges, triangles, mass)
   where
     states = use $ fromList (Z :. 16 :. 3) $
               xyz [(0,0,0,0,0,0),
@@ -203,10 +204,14 @@ getDefaultCloth = (states, uv, edges, triangles)
     triangles = use $ fromList (Z :. 18) [(0,1,4),(1,5,4),(1,5,2),(2,6,5),(2,3,6),(3,7,6),
                  (4,5,8),(5,9,8),(5,6,9),(6,10,9),(6,7,10),(7,11,10),
                  (8,9,12),(9,13,12),(9,10,13),(10,14,13),(10,11,14),(11,15,14)] :: AccVector (Int,Int,Int)
+    --
+    newsize       = lift (Z :. 16 :. All :: Z :. Int :. All)
+    mass_segments = replicate (newsize) $ use $ fromList (Z :. 3) [1,1,1] :: AccMatrix Int
+    mass_indices  = replicate (newsize) $ use $ fromList (Z :. 3) [0,1,2] :: AccMatrix Int
+    mass_values   = replicate (newsize) $ use $ fromList (Z :. 3) [1,1,1] :: AccMatrix Float
+    mass_columns  = use $ fromList (Z :. 16) [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3] :: AccVector Int
+    mass          = (mass_segments, (mass_indices, mass_values), mass_columns) :: AccMultiMatrix Float
     
-
-
-
 -- TODO Implement subtraction for SparseMatrices!
 (|-|) a b = Acc.zipWith (-) a b
 (|*|) a b = Acc.zipWith (*) a b
@@ -224,7 +229,7 @@ step state edges triangles h' = state'
     pfx      = replicate (shape m) $ unit 0 
     h        = replicate (shape pfv) $ unit h'
     h2       = replicate (shape pfv) $ unit (h' * h')
-    m        = replicate (
+    m        = 
     a        = m |-| (h |*| pfv) |-| (h2 |*| pfx) -- TODO SparseMatrix!
     b        = 0
     p        = 
